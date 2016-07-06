@@ -15,6 +15,12 @@ pose.add_interface('socket')
 pose.properties(frequency = 5.0)
 robot.append(pose)
 
+odom = Odometry()
+odom.level("differential")
+odom.add_interface('socket')
+odom.properties(frequency = 5.0)
+robot.append(odom)
+
 motion = Waypoint()
 motion.add_interface('socket')
 robot.append(motion)
