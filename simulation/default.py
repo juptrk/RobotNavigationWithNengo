@@ -21,6 +21,11 @@ odom.add_interface('socket')
 odom.properties(frequency = 5.0)
 robot.append(odom)
 
+int_odom = Odometry()
+int_odom.add_interface('socket')
+int_odom.properties(frequency = 5.0)
+robot.append(int_odom)
+
 motion = Waypoint()
 motion.add_interface('socket')
 robot.append(motion)

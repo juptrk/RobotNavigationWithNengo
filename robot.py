@@ -3,11 +3,14 @@ import time
 
 
 class Robot:
-    x = 15.0
-    y = 10.0
-    direction = 0
+    x = 30.0
+    y = 25.0
 
-    zähler = 0
+    # x = 0.0
+    # y = 0.0
+
+    direction = 0
+    zaehler = 0
     start_time = time.time()
     firststamp = 0
     secondstamp = 0
@@ -16,11 +19,13 @@ class Robot:
 
     def __init__(self, nengo):
         self.nengo_sim = nengo
+        self.nengo_sim.set_robot_sim(self)
         with pymorse.Morse() as simu:
 
             # subscribes to updates from the Pose sensor by passing a callback
-            #simu.robot.pose.subscribe(self.print_pos)
+            simu.robot.pose.subscribe(self.print_pos)
             simu.robot.odom.subscribe(self.print_odom)
+            simu.robot.int_odom.subscribe(self.print_int_odom)
 
             #simu.robot.laser.subscribe(self.print_laser)
 
@@ -33,38 +38,16 @@ class Robot:
             # waits until we reach the target
             while True:
                 if simu.robot.motion.get_status() == "Arrived":
-                    self.direction = self.direction + 1
-
-                    if self.direction == 1:
-                        self.x = 0.0
-                        self.motion_publisher(simu)
-
-                    elif self.direction == 2:
-                        self.y = 20.0
-                        self.motion_publisher(simu)
-
-                    elif self.direction == 3:
-                        self.x = 15.0
-                        self.motion_publisher(simu)
-
-                    elif self.direction == 4:
-                        self.x = 0.0
-                        self.motion_publisher(simu)
-
-                    elif self.direction == 5:
-                        self.y = 10.0
-                        self.motion_publisher(simu)
-
-                    elif self.direction > 5:
                         break
 
                 self.nengo_sim.run_steps(500)
-                self.zähler = self.zähler + 500
+                self.zaehler = self.zaehler + 500
+                self.motion_publisher(simu)
 
 
             print("Here we are! \n")
 
-            print("Python ms: %s \n" % self.zähler)
+            print("Python ms: %s \n" % self.zaehler)
 
             act_time = time.time() - self.start_time
 
@@ -73,15 +56,7 @@ class Robot:
 
     def print_pos(self, pose):
 
-        self.nengo_sim.set_rad_value(pose.get('yaw'))
-
-        print("Yaaaaaw: %s \n" % self.nengo_sim.get_rad_value())
-
-        if self.firstset:
-            self.secondstamp = pose.get('timestamp')
-        else:
-            self.firststamp = pose.get('timestamp')
-            self.firstset = True
+        self.nengo_sim.set_pose(pose)
 
     def print_odom(self, odom):
 
@@ -95,11 +70,14 @@ class Robot:
             self.firststamp = odom.get('timestamp')
             self.firstset = True
 
+    def print_int_odom(self, int_odom):
+
+        self.nengo_sim.set_odom(int_odom)
 
     def print_laser(self, laser):
         print("Laser: %s \n" % laser)
 
     def motion_publisher(self, simulation):
-        simulation.robot.motion.publish({'x': self.x, 'y': self.y, 'z': 0.0,
+        simulation.robot.motion.publish({'x': self.nengo_sim.x_temp, 'y': self.nengo_sim.y_temp, 'z': 0.0,
                                    'tolerance': 0.5,
                                    'speed': 1.0})

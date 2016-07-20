@@ -9,9 +9,9 @@ morse_sim = robot.Robot(nengo_sim)
 
 print("Morse s: %s \n" % (morse_sim.secondstamp - morse_sim.firststamp))
 
-limit = morse_sim.zähler/1000
+limit = morse_sim.zaehler/1000
 
-nengo_sim.print_stuff(limit)
+#nengo_sim.print_stuff(limit)
 
 if __name__ == '__main__':
     root = tk.Tk()
