@@ -1,16 +1,17 @@
 import nengo
 import random
-import math
 
 from nengo.dists import Uniform
 
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-from nengo.utils.matplotlib import rasterplot
-
+import mathematician
 
 
 class Model:
+
+    robot_sim = 0
+    robot_pose = 0
+    robot_odom = 0
+    robot_laser = 0
 
     x_temp = 30.0
     y_temp = 25.0
@@ -23,28 +24,35 @@ class Model:
     model = 0
     sim = 0
     z_rotation = trans_velocity = 0
+    min_distance = max_distance = 0.0
+    scan_distances = 0
 
-    left = right = mover = speed = 0
+    left = right = mover = speed = distance = 0
 
-    left_neuron = right_neuron = left_neuron_changes = right_neuron_changes = mover_neuron = speed_neuron = 0
+    left_neuron = right_neuron = left_neuron_changes = right_neuron_changes = mover_neuron = 0
 
-    left_con = right_con = left_changes = right_changes = mover_con = rot_speed_con = trans_speed_con = 0
+    speed_neuron = distance_neuron = 0
 
-    left_probe = right_probe = mover_probe = speed_probe = 0
+    left_con = right_con = left_changes = right_changes = mover_con = 0
 
-    left_neuron_probe = right_neuron_probe = left_neuron_changes_probe = right_neuron_changes_probe = mover_neuron_probe = speed_neuron_probe = 0
+    rot_speed_con = trans_speed_con = max_distance_con = min_distance_con = 0
 
-    left_con_probe = right_con_probe = left_changes_probe = right_changes_probe = mover_con_probe = rot_speed_con_probe = trans_speed_con_probe = 0
+    left_probe = right_probe = mover_probe = speed_probe = distance_probe = 0
+
+    left_neuron_probe = right_neuron_probe = left_neuron_changes_probe = right_neuron_changes_probe = mover_neuron_probe = 0
+
+    speed_neuron_probe = distance_neuron_probe = 0
+
+    left_con_probe = right_con_probe = left_changes_probe = right_changes_probe = mover_con_probe = 0
+
+    rot_speed_con_probe = trans_speed_con_probe = max_distance_con_probe = min_distance_con_probe = 0
 
     left_raw_probe = right_raw_probe = 0
-
-    robot_sim = 0
-    robot_pose = 0
-    robot_odom = 0
 
 
 
     def __init__(self):
+
         self.x_temp = 30.0
         self.y_temp = 25.0
 
@@ -58,26 +66,31 @@ class Model:
 
         with self.model:
             # Neurons
-            self.left_neuron = nengo.Ensemble(100, dimensions = 1)
+            self.left_neuron = nengo.Ensemble(100, dimensions = 1,
+                                              encoders=mathematician.create_encoders(100, 1, 1))
 
-            self.right_neuron = nengo.Ensemble(100, dimensions=1)
+            self.right_neuron = nengo.Ensemble(100, dimensions=1,
+                                              encoders=mathematician.create_encoders(100, 1, -1))
 
-            self.left_neuron_changes = nengo.Ensemble(100, dimensions=1)
+            self.left_neuron_changes = nengo.Ensemble(100, dimensions=1,
+                                              encoders=mathematician.create_encoders(100, 1, 1))
 
-            self.right_neuron_changes = nengo.Ensemble(100, dimensions=1)
+            self.right_neuron_changes = nengo.Ensemble(100, dimensions=1,
+                                              encoders=mathematician.create_encoders(100, 1, -1))
 
-            self.mover_neuron = nengo.Ensemble(100, dimensions=1,
-                                         intercepts = Uniform(-1.0, 1.0),
-                                         max_rates = Uniform(100, 100),
-                                         encoders = self.create_encoders(100,1,.1))
+            self.mover_neuron = nengo.Ensemble(100, dimensions=1)
 
             self.speed_neuron = nengo.Ensemble(100, dimensions=2)
+
+            self.distance_neuron = nengo.Ensemble(100, dimensions=2)
+
 
             # Input Nodes
             self.low = nengo.Node(output = 1.0)
             self.high = nengo.Node(output = 10.0)
-            self.mover = nengo.Node(output = 1.0)
+            self.mover = nengo.Node(output = 0.01)
             self.speed = nengo.Node(output = 1.0)
+            self.distance = nengo.Node(output = 0.1)
 
             # Connections
             self.left_con = nengo.Connection(self.low, self.left_neuron, function = self.output_whole)
@@ -91,6 +104,9 @@ class Model:
             self.trans_speed_con = nengo.Connection(self.speed, self.speed_neuron[0], function = self.translation_speed)
             self.rot_speed_con = nengo.Connection(self.speed, self.speed_neuron[1], function = self.rotation_speed)
 
+            self.max_distance_con = nengo.Connection(self.distance, self.distance_neuron[0], function = self.maximum_distance)
+            self.min_distance_con = nengo.Connection(self.distance, self.distance_neuron[1], function=self.minimum_distance)
+
 
             # Probes
             ## Input Node Probes
@@ -98,6 +114,7 @@ class Model:
             self.right_probe = nengo.Probe(self.high)
             self.mover_probe = nengo.Probe(self.mover)
             self.speed_probe = nengo.Probe(self.speed)
+            self.distance_probe = nengo.Probe(self.distance)
 
             ## Neuron Probes
             self.left_neuron_probe = nengo.Probe(self.left_neuron, synapse=0.01)
@@ -110,6 +127,8 @@ class Model:
 
             self.speed_neuron_probe = nengo.Probe(self.speed_neuron, synapse=0.01)
 
+            self.distance_neuron_probe = nengo.Probe(self.distance_neuron, synapse=0.01)
+
             ## Connection Probes
             self.left_con_probe = nengo.Probe(self.left_con)
             self.right_con_probe = nengo.Probe(self.right_con)
@@ -121,6 +140,9 @@ class Model:
 
             self.trans_speed_con_probe = nengo.Probe(self.trans_speed_con)
             self.rot_speed_con_probe = nengo.Probe(self.rot_speed_con)
+
+            self.max_distance_con_probe = nengo.Probe(self.max_distance_con)
+            self.min_distance_con_probe = nengo.Probe(self.min_distance_con)
 
             ## Raw Probes
             self.left_raw_probe = nengo.Probe(self.left_neuron.neurons)
@@ -168,6 +190,14 @@ class Model:
 
         return self.trans_velocity * x[0]
 
+    def minimum_distance(self, x):
+
+        return self.min_distance * x[0]
+
+    def maximum_distance(self, x):
+
+        return self.max_distance * x[0]
+
 
 
     def run_steps(self, steps):
@@ -194,30 +224,23 @@ class Model:
 
         self.z_rotation = self.robot_odom.get('wz')
 
-        x_vel = self.robot_odom.get('vx')
-        y_vel = self.robot_odom.get('vy')
+        self.trans_velocity = mathematician.calculate_trans_vel(self.robot_odom.get('vx'), self.robot_odom.get('vy'))
 
-        self.trans_velocity = math.sqrt((x_vel*x_vel) + (y_vel*y_vel))
+    def set_laser(self, laser):
+        act_min = 30.0
+        act_max = 0.0
+        self.scan_distances = laser.get('range_list')
 
-    """
-    Method gets a number of neurons, a number of dimensions and a encoder value.
-    Then it creats an with the corresonding number of encoders, all with the same value.
-    If you want to have different values for different encoders, you have to create the array by your own.
-    """
-    def create_encoders(self, neurons, dimensions, content):
+        for i in range(0, len(self.scan_distances)):
+            act_distance = self.scan_distances[i]
 
-        first_neuron = [content]
+            if act_distance < act_min:
+                act_min = act_distance
 
-        for i in range(1, dimensions):
-            first_neuron.append(content)
+            if act_distance > act_max:
+                act_max = act_distance
 
-        encoders = [first_neuron]
+        self.min_distance = act_min
+        self.max_distance = act_max
 
-        for i in range(1, neurons):
-            neuron = [content]
-            for j in range(1, dimensions):
-                neuron.append(content)
 
-            encoders.append(neuron)
-
-        return encoders

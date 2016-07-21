@@ -26,8 +26,7 @@ class Robot:
             simu.robot.pose.subscribe(self.print_pos)
             simu.robot.odom.subscribe(self.print_odom)
             simu.robot.int_odom.subscribe(self.print_int_odom)
-
-            #simu.robot.laser.subscribe(self.print_laser)
+            simu.robot.laser.subscribe(self.print_laser)
 
             # sends a destination
             self.motion_publisher(simu)
@@ -75,7 +74,7 @@ class Robot:
         self.nengo_sim.set_odom(int_odom)
 
     def print_laser(self, laser):
-        print("Laser: %s \n" % laser)
+        self.nengo_sim.set_laser(laser)
 
     def motion_publisher(self, simulation):
         simulation.robot.motion.publish({'x': self.nengo_sim.x_temp, 'y': self.nengo_sim.y_temp, 'z': 0.0,
