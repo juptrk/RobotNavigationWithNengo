@@ -11,10 +11,6 @@ from morse.builder import *
 robot = ATRV()
 robot.properties(frequency = 50.0)
 
-robot.translate(17.0, -13.0, 0.0)
-robot.rotate(0.0, 0.0, 2.5)
-
-
 pose = Pose()
 pose.add_interface('socket')
 pose.properties(frequency = 50.0)
@@ -31,20 +27,15 @@ int_odom.add_interface('socket')
 int_odom.properties(frequency = 50.0)
 robot.append(int_odom)
 
-goal = Waypoint()
-goal.add_interface('socket')
-goal.properties(ObstacleAvoidance = False)
-robot.append(goal)
-
-motion = MotionVW()
+motion = Waypoint()
 motion.add_interface('socket')
 robot.append(motion)
 
 # Append a laser scanner
-# Sick LMS500, range: 30m, field: 180deg, 90 sample points
+# Sick LMS500, range: 30m, field: 180deg, 180 sample points
 laser = Sick()
 laser.add_stream('socket')
-laser.properties(resolution = 2.0)
+laser.properties(resolution = 3.0)
 laser.properties(scan_window = 180.0)
 laser.properties(frequency = 50.0)
 robot.append(laser)
@@ -58,5 +49,4 @@ keyboard.properties(ControlType = 'Position')
 robot.add_default_interface('socket')
 
 # Environment
-env = Environment('/home/julian/PycharmProjects/RobotNavigationWithNengo/simulation/environments/boxes_custom.blend')
-env.set_camera_location([30.0,-25.0,30.0])
+env = Environment('/home/julian/PycharmProjects/RobotNavigationWithNengo/simulation/environments/land_empty.blend')
