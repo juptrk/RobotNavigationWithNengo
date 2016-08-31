@@ -14,7 +14,7 @@ class Model:
     """
 
     goal_world = [-10.0, 8.0, 0.0] # form: (x, y, theta)
-    goal_odom = [0.0, 0.0, 0.0] # form: (x, y, theta)
+    goal_odom = [100.0, 100.0, 0.0] # form: (x, y, theta)
     act_pos = [0.0, 0.0, 0.0] # form: (x, y, theta)
 
     """
@@ -55,40 +55,17 @@ class Model:
 
     mover_neuron = 0
 
-    position_neuron = 0
-    velocity_neuron = 0
-    goal_neuron = 0
-    controlling_neuron = 0
-
     "Input Node variables"
 
     medium = 0
-
-    position = 0
-    velocity = 0
-    odometry_goal = 0
-    distances = 0
 
     "Connection Variables"
 
     mover_con = 0
 
-    position_connection = 0
-    velocity_connection = 0
-    goal_connection = 0
-
     "Probe variables"
 
     mover_neuron_probe = 0
-    mover_con_probe = 0
-
-    position_neuron_probe = 0
-    velocity_neuron_probe = 0
-    goal_neuron_probe = 0
-
-    position_connection_probe = 0
-    velocity_connection_probe = 0
-    goal_connection_probe = 0
 
     """
     Obstacle Avoidance specific variables.
@@ -99,6 +76,38 @@ class Model:
     max_acc = [0.3, 0.4]  # form: (v_acc in m/s^2, w_acc in deg/s^2 [---])
     max_dec = [0.4, 0.5]  # form: (v_dec in m/s^2, w_dec in deg/s^2 [---])
 
+    proportional = 0.0
+    integral = 0.0
+    derivate = 0.0
+
+    ####################################################################################################################
+    # left_neuron = right_neuron = left_changes_neuron = right_changes_neuron = 0
+    #
+    # trans_speed_neuron = rot_speed_neuron = max_distance_neuron = min_distance_neuron = 0
+    #
+    # x_act_neuron = x_fut_neuron = y_act_neuron = y_fut_neuron = 0
+    ####################################################################################################################
+    # very_low = low = high = 0
+    ####################################################################################################################
+    # left_con = right_con = left_changes = right_changes = 0
+    #
+    # rot_speed_con = trans_speed_con = max_distance_con = min_distance_con = 0
+    #
+    # x_act_con = x_fut_con = y_act_con = y_fut_con = 0
+    ####################################################################################################################
+    # left_neuron_probe = right_neuron_probe = left_neuron_changes_probe = right_neuron_changes_probe = 0
+    #
+    # trans_speed_neuron_probe = rot_speed_neuron_probe = max_distance_neuron_probe = min_distance_neuron_probe = 0
+    #
+    # x_act_neuron_probe = x_fut_neuron_probe = y_act_neuron_probe = y_fut_neuron_probe = 0
+    #
+    # left_con_probe = right_con_probe = left_changes_probe = right_changes_probe = mover_con_probe = 0
+    #
+    # rot_speed_con_probe = trans_speed_con_probe = max_distance_con_probe = min_distance_con_probe = 0
+    #
+    # x_act_con_probe = x_fut_con_probe = y_act_con_probe = y_fut_con_probe = 0
+    ####################################################################################################################
+
 
     """
     Method initializes a model which uses the dynamic window approach with alternative heuristics to navigate a robot
@@ -106,92 +115,119 @@ class Model:
 
     def __init__(self):
 
-        self.vel = [1.0, 0.0]
-        self.model = nengo.Network(label = 'Morse - Nengo')
+        # self.model = nengo.Network(label = 'Morse - Nengo')
 
-        with self.model:
+        # with self.model:
 
             "Neurons are created"
 
-            self.mover_neuron = nengo.Ensemble(100, dimensions=1)
-
-            self.position_neuron = nengo.Ensemble(300, dimensions = 3, radius = 60.0, neuron_type=nengo.Direct())
-            self.velocity_neuron = nengo.Ensemble(200, dimensions = 2, radius = 3.0, neuron_type=nengo.Direct())
-            self.goal_neuron = nengo.Ensemble(300, dimensions = 3, radius = 60.0, neuron_type=nengo.Direct())
-            #self.controlling_neuron = nengo.Ensemble(200, dimensions = 2, radius = 2.0)
+            # self.mover_neuron = nengo.Ensemble(100, dimensions=1)
 
             "Input Nodes are created"
 
-            self.medium = nengo.Node(output = 1.0)
-
-            self.position = nengo.Node(output = 1.0)
-            self.velocity = nengo.Node(output = 1.0)
-            self.odometry_goal = nengo.Node(output = 1.0)
-            #self.distances = nengo.Node(output = 1)
+            # self.medium = nengo.Node(output = 1.0)
 
             "Connections are established"
 
-            self.mover_con = nengo.Connection(self.medium, self.mover_neuron, function = self.move)
-
-            self.position_connection = nengo.Connection(self.position,
-                                                        self.position_neuron,
-                                                        function = self.get_position,
-                                                        synapse = 0.01)
-            self.velocity_connection = nengo.Connection(self.velocity,
-                                                        self.velocity_neuron,
-                                                        function=self.get_velocity,
-                                                        synapse=0.01)
-            self.goal_connection = nengo.Connection(self.odometry_goal,
-                                                        self.goal_neuron,
-                                                        function=self.get_goal,
-                                                        synapse=0.01)
-
+            # self.mover_con = nengo.Connection(self.medium, self.mover_neuron, function = self.move)
 
             "Probes"
 
             # Neuron Probes
 
-            self.mover_neuron_probe = nengo.Probe(self.mover_neuron, synapse=0.01)
-
-            self.position_neuron_probe = nengo.Probe(self.position_neuron, synapse=0.01)
-            self.velocity_neuron_probe = nengo.Probe(self.velocity_neuron, synapse=0.01)
-            self.goal_neuron_probe = nengo.Probe(self.goal_neuron, synapse=0.01)
-
+            # self.mover_neuron_probe = nengo.Probe(self.mover_neuron, synapse=0.01)
 
             # Connection Probes
 
-            self.mover_con_probe = nengo.Probe(self.mover_con)
+            # self.mover_con_probe = nengo.Probe(self.mover_con)
 
-            self.position_connection_probe = nengo.Probe(self.position_connection)
-            self.velocity_connection_probe = nengo.Probe(self.velocity_connection)
+            ############################################################################################################
+            # self.left_neuron = nengo.Ensemble(100, dimensions = 1,
+            #                                   encoders=mathematician.create_encoders(100, 1, 1, 0.25))
+            #
+            # self.right_neuron = nengo.Ensemble(100, dimensions=1,
+            #                                   encoders=mathematician.create_encoders(100, 1, -1, 0.25))
+            #
+            # self.left_changes_neuron = nengo.Ensemble(100, dimensions=1,
+            #                                   encoders=mathematician.create_encoders(100, 1, 1, 0.1))
+            #
+            # self.right_changes_neuron = nengo.Ensemble(100, dimensions=1,
+            #                                   encoders=mathematician.create_encoders(100, 1, -1, 0.1))
+            #
+            # self.rot_speed_neuron = nengo.Ensemble(100, dimensions=1)
+            # self.trans_speed_neuron = nengo.Ensemble(100, dimensions=1)
+            #
+            # self.max_distance_neuron = nengo.Ensemble(100, dimensions=1)
+            # self.min_distance_neuron = nengo.Ensemble(100, dimensions=1)
+            #
+            # self.x_act_neuron = nengo.Ensemble(100, dimensions=1)
+            # self.x_fut_neuron = nengo.Ensemble(100, dimensions=1)
+            #
+            # self.y_act_neuron = nengo.Ensemble(100, dimensions=1)
+            # self.y_fut_neuron = nengo.Ensemble(100, dimensions=1)
+            ############################################################################################################
+            # self.left_con = nengo.Connection(self.medium, self.left_neuron, function = self.output_whole)
+            # self.right_con = nengo.Connection(self.medium, self.right_neuron, function = self.output_whole)
+            #
+            # self.left_changes = nengo.Connection(self.high, self.left_changes_neuron, function = self.output_change)
+            # self.right_changes = nengo.Connection(self.high, self.right_changes_neuron, function = self.output_change)
+            #
+            # self.trans_speed_con = nengo.Connection(self.medium, self.trans_speed_neuron, function = self.translation_speed)
+            # self.rot_speed_con = nengo.Connection(self.medium, self.rot_speed_neuron, function = self.rotation_speed)
+            #
+            # self.max_distance_con = nengo.Connection(self.low, self.max_distance_neuron, function=self.maximum_distance)
+            # self.min_distance_con = nengo.Connection(self.low, self.min_distance_neuron, function=self.minimum_distance)
+            #
+            # self.x_act_con = nengo.Connection(self.low, self.x_act_neuron, function=self.act_x)
+            # self.x_fut_con = nengo.Connection(self.low, self.x_fut_neuron, function=self.future_x)
+            #
+            # self.y_act_con = nengo.Connection(self.low, self.y_act_neuron, function=self.act_y)
+            # self.y_fut_con = nengo.Connection(self.low, self.y_fut_neuron, function=self.future_y)
+            ############################################################################################################
+            #self.very_low = nengo.Node(output=0.01)
+            #self.low = nengo.Node(output=0.1)
+            #self.high = nengo.Node(output=10.0)
+            ############################################################################################################
+            # self.left_neuron_probe = nengo.Probe(self.left_neuron, synapse=0.01)
+            # self.right_neuron_probe = nengo.Probe(self.right_neuron, synapse=0.01)
+            #
+            # self.left_changes_neuron_probe = nengo.Probe(self.left_changes_neuron, synapse=0.01)
+            # self.right_changes_neuron_probe = nengo.Probe(self.right_changes_neuron, synapse=0.01)
+            #
+            #
+            # self.trans_speed_neuron_probe = nengo.Probe(self.trans_speed_neuron, synapse=0.01)
+            # self.rot_speed_neuron_probe = nengo.Probe(self.rot_speed_neuron, synapse=0.01)
+            #
+            # self.max_distance_neuron_probe = nengo.Probe(self.max_distance_neuron, synapse=0.01)
+            # self.min_distance_neuron_probe = nengo.Probe(self.min_distance_neuron, synapse=0.01)
+            #
+            # self.x_act_neuron_probe = nengo.Probe(self.x_act_neuron, synapse=0.01)
+            # self.x_fut_neuron_probe = nengo.Probe(self.x_fut_neuron, synapse=0.01)
+            #
+            # self.y_act_neuron_probe = nengo.Probe(self.y_act_neuron, synapse=0.01)
+            # self.y_fut_neuron_probe = nengo.Probe(self.y_fut_neuron, synapse=0.01)
+            ############################################################################################################
+            # self.left_con_probe = nengo.Probe(self.left_con)
+            # self.right_con_probe = nengo.Probe(self.right_con)
+            #
+            # self.left_changes_probe = nengo.Probe(self.left_changes)
+            # self.right_changes_probe = nengo.Probe(self.right_changes)
+            #
+            #
+            # self.trans_speed_con_probe = nengo.Probe(self.trans_speed_con)
+            # self.rot_speed_con_probe = nengo.Probe(self.rot_speed_con)
+            #
+            # self.max_distance_con_probe = nengo.Probe(self.max_distance_con)
+            # self.min_distance_con_probe = nengo.Probe(self.min_distance_con)
+            #
+            # self.x_act_con_probe = nengo.Probe(self.x_act_con)
+            # self.x_fut_con_probe = nengo.Probe(self.x_fut_con)
+            #
+            # self.y_act_con_probe = nengo.Probe(self.y_act_con)
+            # self.y_fut_con_probe = nengo.Probe(self.y_fut_con)
+            ############################################################################################################
 
-
-        self.sim = nengo.Simulator(self.model, dt=0.01)
-
-    """
-    gives back the actual position
-    """
-
-    def get_position(self, x):
-
-        return self.act_pos
-
-    """
-    gives back the actual velocity
-    """
-
-    def get_velocity(self, x):
-
-        return self.act_vel
-
-    """
-    gives back the odometry goal
-    """
-
-    def get_goal(self, x):
-
-        return self.act_vel
-
+        # self.sim = nengo.Simulator(self.model, dt=0.05)
 
     """
     normalizes the whole rotation with pi, multiplies it with the input an returns it
@@ -227,12 +263,9 @@ class Model:
                                                 self.scan_distances,
                                                 self.t)
 
-        if len(best_vel) > 0:
-            self.vel = best_vel
+        self.vel = best_vel
 
-        print(self.vel)
-
-        return self.vel[0] * x[0]
+        #return best_vel[0] * x[0]
 
     """
     multiplies the actual translational velocity with the input and returns it
@@ -321,8 +354,7 @@ class Model:
     """
 
     def step(self):
-        if self.sim != 0:
-            self.sim.step()
+       self.sim.step()
 
     """
     Returns the class variable rad_value
@@ -494,13 +526,13 @@ class Model:
 
                 counter_dyn += 1
 
-                velocity = [lower_v, lower_w]
+                vel = [lower_v, lower_w]
                 path_dist = 30
 
-                fut_pos = mathematician.calculate_future_pos(act_pos, velocity, t)
+                fut_pos = mathematician.calculate_future_pos(act_pos, vel, t)
                 dif_point = mathematician.transformate_point(act_pos, fut_pos)
 
-                fut_pos2 = mathematician.calculate_future_pos(act_pos, velocity, t*2)
+                fut_pos2 = mathematician.calculate_future_pos(act_pos, vel, t*2)
                 dif_point2 = mathematician.transformate_point(act_pos, fut_pos2)
 
                 angle = math.degrees(dif_point[2])
@@ -562,18 +594,18 @@ class Model:
                     if angle < 0:
                         compare_vel[1] = -compare_vel[1]
 
-                        if velocity[0] <= compare_vel[0] and velocity[1] >= compare_vel[1]:
+                        if vel[0] <= compare_vel[0] and vel[1] >= compare_vel[1]:
                             counter_ad += 1
                             dists.append(path_dist)
-                            velocities.append(velocity)
+                            velocities.append(vel)
 
                     else:
-                        if velocity[0] <= compare_vel[0] and velocity[1] <= compare_vel[1]:
+                        if vel[0] <= compare_vel[0] and vel[1] <= compare_vel[1]:
                             counter_ad += 1
                             dists.append(path_dist)
-                            velocities.append(velocity)
+                            velocities.append(vel)
 
-                print("The velocity %s is compared to the velocity %r" % (velocity, compare_vel))
+                print("The velocity %s is compared to the velocity %r" % (vel, compare_vel))
                 print("Distance on path after is %s \n" % path_dist)
 
                 lower_v += v_step

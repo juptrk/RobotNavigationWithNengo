@@ -89,7 +89,7 @@ class Robot:
                 x_dist = math.fabs(self.goal_odom[0] - self.position[0])
                 y_dist = math.fabs(self.goal_odom[1] - self.position[1])
 
-                if x_dist <= 0.5 and y_dist <= 0.5:
+                if x_dist <= 3.0 and y_dist <= 3.0:
                     self.nengo_sim.vel = [0.0, 0.0]
                     self.motion_publisher(self.simu)
                     break
@@ -110,9 +110,9 @@ class Robot:
 
                     self.pose_set = self.odom_set = self.laser_set = self.rad_set = False
 
-                    #self.nengo_sim.sim.step()
-                    self.nengo_sim.move(.5)
-                    self.zaehler += .05
+                    self.nengo_sim.step()
+                    #self.nengo_sim.move(.5)
+                    self.zaehler += .005
 
                     self.motion_publisher(self.simu)
 

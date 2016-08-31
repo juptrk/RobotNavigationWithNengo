@@ -20,7 +20,7 @@ The value is found by trying and must be positive or at least zero.
 """
 
 
-p = 1.0
+p = 0.8
 
 
 """
@@ -251,7 +251,7 @@ The goal needs to be given from the robots perspective.
 """
 
 
-def p_control(act_pos, goal_robot, velocities, t):
+def p_control(act_pos, goal_robot, velocities, dists, t):
 
     distance = calculate_hypot(goal_robot[0], goal_robot[1])
 
@@ -282,9 +282,10 @@ def p_control(act_pos, goal_robot, velocities, t):
         fut_distance = (v_factor * math.fabs(vel_pot[0] - vel[0])) + (w_factor * math.fabs(vel_pot[1] - vel[1]))
 
         e = scale(fut_distance, 0, max_distance)
+        e2 = 1 - scale(dists[i], 0.0, 2.5)
 
-        if e > best_weight:
-            best_weight = e
+        if (e+e2) > best_weight:
+            best_weight = (e+e2)
             smallest_distance = fut_distance
             best_vel = vel
 

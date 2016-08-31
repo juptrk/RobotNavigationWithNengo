@@ -1,4 +1,6 @@
 import tkinter as tk
+import dwa
+
 import model
 import gui
 import robot
@@ -9,13 +11,11 @@ morse_sim = robot.Robot(nengo_sim)
 
 print("Morse s: %s \n" % (morse_sim.secondstamp - morse_sim.firststamp))
 
-limit = morse_sim.zaehler/1000
-
 #nengo_sim.print_stuff(limit)
 
 if __name__ == '__main__':
     root = tk.Tk()
-    app = gui.Gui(root, nengo_sim, limit)
+    app = gui.Gui(root, nengo_sim)
     root.title("MatplotLib with Tkinter")
     root.update()
     root.deiconify()
