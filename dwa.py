@@ -49,7 +49,7 @@ class DWA:
         """
         self.robot_sim = 0
         self.robot_odom = 0
-        t = .9
+        self.t = .9
 
         """
         Laser specific variables

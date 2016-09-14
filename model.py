@@ -85,7 +85,6 @@ class Model:
             "Input Nodes are created"
 
             self.__position = nengo.Node(output=1.0)
-            self.__velocity = nengo.Node(output=1.0)
             self.__odometry_goal = nengo.Node(output=1.0)
             self.__distances = nengo.Node(output=1.0)
             self.__window = nengo.Node(output=1.0)
@@ -105,10 +104,6 @@ class Model:
             self.__position_neuron = nengo.Ensemble(300,
                                                   dimensions=3,
                                                   radius=60.0,
-                                                  neuron_type=nengo.Direct())
-            self.__velocity_neuron = nengo.Ensemble(200,
-                                                  dimensions=2,
-                                                  radius=3.0,
                                                   neuron_type=nengo.Direct())
             self.__goal_neuron = nengo.Ensemble(300,
                                               dimensions=3,
@@ -164,10 +159,6 @@ class Model:
             self.__position_connection = nengo.Connection(self.__position,
                                                         self.__position_neuron,
                                                         function=self.get_position,
-                                                        synapse=0.05)
-            self.__velocity_connection = nengo.Connection(self.__velocity,
-                                                        self.__velocity_neuron,
-                                                        function=self.get_velocity,
                                                         synapse=0.05)
             self.__goal_connection = nengo.Connection(self.__odometry_goal,
                                                     self.__goal_neuron,
@@ -650,9 +641,9 @@ class Model:
 
         best_vel = vel_pot
 
+        i = 0
         # goes through th  velocities and calculates the weights for them
         for vel in velocities:
-
             v_distance = math.fabs(vel_pot[0] - vel[0])
             w_distance = math.fabs(vel_pot[1] - vel[1])
 
@@ -664,6 +655,8 @@ class Model:
             if (e + e2 + e3) > best_weight:
                 best_weight = (e + e2 + e3)
                 best_vel = vel
+
+            i += 1
 
         # sets the class attribute vel to the new best_vel
         self.vel = best_vel

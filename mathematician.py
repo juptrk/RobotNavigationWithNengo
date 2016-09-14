@@ -149,6 +149,8 @@ def pi_control(goal_robot, velocities, dists, integral_sum, smallest, angle):
     best_weight = 0.0
     best_vel = vel_pot
 
+    i = 0
+
     # goes through th  velocities and calculates the weights for them
     for vel in velocities:
 
@@ -163,6 +165,8 @@ def pi_control(goal_robot, velocities, dists, integral_sum, smallest, angle):
         if (e+e2+e3) > best_weight:
             best_weight = (e+e2+e3)
             best_vel = vel
+
+        i += 1
 
     # returns the best velocity
     return best_vel

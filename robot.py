@@ -37,7 +37,7 @@ class Robot:
 
         "Data set booleans - several times"
 
-        self.odom_set = laser_set = False
+        self.odom_set = self.laser_set = False
 
         """
         Robot specific variables
