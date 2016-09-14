@@ -6,307 +6,693 @@ import mathematician
 class Model:
 
     """
-    Class variables are created and initialized
-    """
-
-    """
-    Position variables
-    """
-
-    goal_world = [-10.0, 8.0, 0.0] # form: (x, y, theta)
-    goal_odom = [0.0, 0.0, 0.0] # form: (x, y, theta)
-    act_pos = [0.0, 0.0, 0.0] # form: (x, y, theta)
-
-    """
-    Velocity variables
-    """
-
-    vel = [1.0, 0.0] # form: (v, w)
-    act_vel = [0.0, 0.0] # form: (v, w)
-
-    """
-    Robot specific variables
-    """
-
-    robot_sim = 0
-    robot_pose = 0
-    robot_odom = 0
-    rad_value = rad_change = 0
-    z_rotation = trans_velocity = 0.0
-    min_distance = max_distance = 0.0
-    t = .8
-
-    "Laser specific variables"
-
-    scan_distances = []
-    laser_points = []
-
-    scan_window = 180.0
-    laser_res = 2.0
-
-    """
-    Model specific variables
-    """
-
-    model = 0
-    sim = 0
-
-    "Neuron variables"
-
-    mover_neuron = 0
-
-    position_neuron = 0
-    velocity_neuron = 0
-    goal_neuron = 0
-    controlling_neuron = 0
-
-    "Input Node variables"
-
-    medium = 0
-
-    position = 0
-    velocity = 0
-    odometry_goal = 0
-    distances = 0
-
-    "Connection Variables"
-
-    mover_con = 0
-
-    position_connection = 0
-    velocity_connection = 0
-    goal_connection = 0
-
-    "Probe variables"
-
-    mover_neuron_probe = 0
-    mover_con_probe = 0
-
-    position_neuron_probe = 0
-    velocity_neuron_probe = 0
-    goal_neuron_probe = 0
-
-    position_connection_probe = 0
-    velocity_connection_probe = 0
-    goal_connection_probe = 0
-
-    """
-    Obstacle Avoidance specific variables.
-    Maximum speed, acceleration and decceleration values for the translational and angular velocity
-    """
-
-    max_vel = [1.0, 1.57]  # form: (v in m/s, w in deg/s [90])
-    max_acc = [0.3, 0.4]  # form: (v_acc in m/s^2, w_acc in deg/s^2 [---])
-    max_dec = [0.4, 0.5]  # form: (v_dec in m/s^2, w_dec in deg/s^2 [---])
-
-
-    """
-    Method initializes a model which uses the dynamic window approach with alternative heuristics to navigate a robot
+    Method initializes a neural model which uses the dynamic window approach with alternative heuristics to navigate a robot
     """
 
     def __init__(self):
 
-        self.vel = [1.0, 0.0]
-        self.model = nengo.Network(label = 'Morse - Nengo')
+        """
+        Position variables
+        """
+        self.__goal_world = [-28.0, 0.0, 0.0]  # form: (x, y, theta)
+        self.__goal_odom = [-28.0, 0.0, 0.0]  # form: (x, y, theta)
+        self.__act_pos = [0.0, 0.0, 0.0]  # form: (x, y, theta)
 
-        with self.model:
+        """
+        Velocity variables
+        """
+        self.vel = [1.0, 0.0]  # form: (v, w)
+        self.__act_vel = [0.0, 0.0]  # form: (v, w)
 
-            "Neurons are created"
+        """
+        Robot specific variables
+        """
+        self.__robot_sim = 0
+        self.__t = .9
 
-            self.mover_neuron = nengo.Ensemble(100, dimensions=1)
+        "Laser specific variables"
+        self.__scan_distances = []
 
-            self.position_neuron = nengo.Ensemble(300, dimensions = 3, radius = 60.0, neuron_type=nengo.Direct())
-            self.velocity_neuron = nengo.Ensemble(200, dimensions = 2, radius = 3.0, neuron_type=nengo.Direct())
-            self.goal_neuron = nengo.Ensemble(300, dimensions = 3, radius = 60.0, neuron_type=nengo.Direct())
-            #self.controlling_neuron = nengo.Ensemble(200, dimensions = 2, radius = 2.0)
+        for i in range(0, 91):
+            self.__scan_distances.append(30.0)
+
+        self.__scan_window = 180.0
+        self.__laser_res = 2.0
+        self.__distance_radius = 30.0
+
+        """
+        Obstacle Avoidance specific variables.
+        Maximum speed and decceleration values for the translational and angular velocity
+        Moreover the dynamic window is created with the specified translational and rotational velocities
+        """
+        self.__max_vel = [1.0, 1.0]  # form: (v in m/s, w in deg/s [90])
+        self.__max_dec = [0.4, 0.5]  # form: (v_dec in m/s^2, w_dec in deg/s^2 [---])
+
+        self.__translational_velocities = [0.0, 0.25, 0.5, 0.75, 1.0]
+        self.__rotational_velocities = [-1.0,-0.8,-0.6,-0.4,-0.2,
+                                        0.0,0.2,0.4,0.6,0.8,1.0]
+        self.__dynamic_window = []
+
+        for i in self.__translational_velocities:
+            for j in self.__rotational_velocities:
+                self.__dynamic_window.append([i, j])
+
+        """
+        Value for the p controller.
+        The values are found by trying and must be positive or at least zero.
+        """
+        self.__v_proportional = 1.0
+        self.__proportional = 1.0
+        self.__integral = 0.12
+        self.__weighting = 1.5
+        self.__v_factor = .55
+        self.__w_factor = .45
+
+        # Creates the Network
+        self.__model = nengo.Network(label = 'Morse - Nengo')
+
+        # Calculates the number of scans
+        self.__scans = int(self.__scan_window/self.__laser_res) + 1
+
+        """
+        Calculates the value for the length of a list, that contains the (v,w) pairs from the the dynamic window
+        not as lists of two, but in a row, e.g. [v1,w1,v2,w2,v3,w3,v4,w4,...]
+        """
+        self.__velocities_combination = len(self.__dynamic_window) * 2
+
+        with self.__model:
 
             "Input Nodes are created"
 
-            self.medium = nengo.Node(output = 1.0)
+            self.__position = nengo.Node(output=1.0)
+            self.__velocity = nengo.Node(output=1.0)
+            self.__odometry_goal = nengo.Node(output=1.0)
+            self.__distances = nengo.Node(output=1.0)
+            self.__window = nengo.Node(output=1.0)
 
-            self.position = nengo.Node(output = 1.0)
-            self.velocity = nengo.Node(output = 1.0)
-            self.odometry_goal = nengo.Node(output = 1.0)
-            #self.distances = nengo.Node(output = 1)
+            """
+            Neurons are created.
 
-            "Connections are established"
+            Most of them are Neurons of type Direct.
+            Every neuron has as much dimensions as its input list will have values. The number of neurons is 100 for
+            every dimension if there are less then 10, for more dimensions there are 10 neurons for every dimension.
+            the radius gives the range to which the neuron react without saturating.
 
-            self.mover_con = nengo.Connection(self.medium, self.mover_neuron, function = self.move)
+            For the LIFRate neuron the time constant after which the activation will be 0 again is set to tau_rc = .05.
+            How long the activation is held at zero after a spike is set by tau_ref = .002.
+            """
 
-            self.position_connection = nengo.Connection(self.position,
-                                                        self.position_neuron,
-                                                        function = self.get_position,
-                                                        synapse = 0.01)
-            self.velocity_connection = nengo.Connection(self.velocity,
-                                                        self.velocity_neuron,
+            self.__position_neuron = nengo.Ensemble(300,
+                                                  dimensions=3,
+                                                  radius=60.0,
+                                                  neuron_type=nengo.Direct())
+            self.__velocity_neuron = nengo.Ensemble(200,
+                                                  dimensions=2,
+                                                  radius=3.0,
+                                                  neuron_type=nengo.Direct())
+            self.__goal_neuron = nengo.Ensemble(300,
+                                              dimensions=3,
+                                              radius=60.0,
+                                              neuron_type=nengo.Direct())
+            self.__distances_neuron = nengo.Ensemble(self.__scans*10,
+                                                   dimensions=self.__scans,
+                                                   radius=self.__distance_radius,
+                                                   neuron_type=nengo.Direct())
+            self.__position_goal_neuron = nengo.Ensemble(600,
+                                                       dimensions=6,
+                                                       radius=60.0,
+                                                       neuron_type=nengo.Direct())
+            self.__dynamic_window_neuron = nengo.Ensemble(self.__velocities_combination*10,
+                                                        dimensions=self.__velocities_combination,
+                                                        radius=3.0,
+                                                        neuron_type=nengo.Direct())
+
+            self.__position_window_distances_neuron = nengo.Ensemble(30+((self.__velocities_combination+self.__scans)*10),
+                                                                   dimensions=3+self.__velocities_combination+self.__scans,
+                                                                   radius=60.0,
+                                                                   neuron_type=nengo.Direct())
+
+            self.__robot_goal_neuron = nengo.Ensemble(300,
+                                                             dimensions=3,
+                                                             radius=60.0,
+                                                             neuron_type=nengo.Direct())
+
+            self.__admissible_velocities_neuron = nengo.Ensemble(self.__velocities_combination*15,
+                                                               dimensions=int(self.__velocities_combination*1.5),
+                                                               radius=60.0,
+                                                               neuron_type=nengo.Direct())
+
+            self.__robot_goal_admissible_neuron = nengo.Ensemble(40 + self.__velocities_combination*15,
+                                                                   dimensions=4 + int(self.__velocities_combination*1.5),
+                                                                   radius=60.0,
+                                                                   neuron_type=nengo.Direct())
+
+            self.__integrator = nengo.Ensemble(100, dimensions=1, radius=4.0, neuron_type=nengo.LIFRate(tau_rc=0.05, tau_ref=0.002))
+
+            self.__controlling_neuron = nengo.Ensemble(200,
+                                                     dimensions=2,
+                                                     radius=3.0,
+                                                     neuron_type=nengo.Direct())
+
+            """
+            Connections are established.
+
+            All Connections use a .05 synapse Lowpass filter for filtering the input.
+            They use different functions which are implemented later in the class.
+            """
+
+            self.__position_connection = nengo.Connection(self.__position,
+                                                        self.__position_neuron,
+                                                        function=self.get_position,
+                                                        synapse=0.05)
+            self.__velocity_connection = nengo.Connection(self.__velocity,
+                                                        self.__velocity_neuron,
                                                         function=self.get_velocity,
-                                                        synapse=0.01)
-            self.goal_connection = nengo.Connection(self.odometry_goal,
-                                                        self.goal_neuron,
-                                                        function=self.get_goal,
-                                                        synapse=0.01)
+                                                        synapse=0.05)
+            self.__goal_connection = nengo.Connection(self.__odometry_goal,
+                                                    self.__goal_neuron,
+                                                    function=self.get_goal,
+                                                        synapse=0.05)
+            self.__distances_connection = nengo.Connection(self.__distances,
+                                                         self.__distances_neuron,
+                                                         function=self.get_distances,
+                                                        synapse=0.05)
+            self.__dynamic_window_connection = nengo.Connection(self.__window,
+                                                              self.__dynamic_window_neuron,
+                                                              function=self.get_dynamic_window,
+                                                        synapse=0.05)
+
+            self.__position_goal_connection = nengo.Connection(self.__position_neuron,
+                                                             self.__position_goal_neuron,
+                                                             function=self.combine_position_goal,
+                                                        synapse=0.05)
+            self.__goal_position_connection = nengo.Connection(self.__goal_neuron,
+                                                             self.__position_goal_neuron,
+                                                             function=self.combine_goal_position,
+                                                        synapse=0.05)
+
+            self.__position_window_distances_connection = nengo.Connection(self.__position_neuron,
+                                                                         self.__position_window_distances_neuron,
+                                                                         function=self.combine_position_window_distances,
+                                                        synapse=0.05)
+            self.__window_position_distances_connection = nengo.Connection(self.__dynamic_window_neuron,
+                                                               self.__position_window_distances_neuron,
+                                                               function=self.combine_window_position_distances,
+                                                        synapse=0.05)
+            self.__distances_position_window_connection = nengo.Connection(self.__distances_neuron,
+                                                                         self.__position_window_distances_neuron,
+                                                                         function=self.combine_distances_position_window,
+                                                        synapse=0.05)
+
+            self.__robot_goal_connection = nengo.Connection(self.__position_goal_neuron,
+                                                                   self.__robot_goal_neuron,
+                                                                   function=self.get_robot_goal,
+                                                        synapse=0.05)
+
+            self.__admissible_velocities_connection = nengo.Connection(self.__position_window_distances_neuron,
+                                                                     self.__admissible_velocities_neuron,
+                                                                     function=self.get_admissible_velocities,
+                                                        synapse=0.05)
+
+            self.__robot_goal_admissible_connection = nengo.Connection(self.__robot_goal_neuron,
+                                                                         self.__robot_goal_admissible_neuron,
+                                                                         function=self.combine_robot_goal_admissible,
+                                                        synapse=0.05)
+            self.__admissible_robot_goal_connection = nengo.Connection(self.__admissible_velocities_neuron,
+                                                                         self.__robot_goal_admissible_neuron,
+                                                                         function=self.combine_admissible_robot_goal,
+                                                        synapse=0.05)
+
+            self.__integrator_connection = nengo.Connection(self.__robot_goal_neuron,
+                                                          self.__integrator,
+                                                          transform=[[0.05]],
+                                                          function=self.get_goal_angle,
+                                                        synapse=0.05)
+            self.__integrator_self_connection = nengo.Connection(self.__integrator,
+                                                               self.__integrator,
+                                                               transform=[[1]],
+                                                        synapse=0.05)
+
+            self.__integrator_send_connection = nengo.Connection(self.__integrator,
+                                                               self.__robot_goal_admissible_neuron,
+                                                               function=self.combine_integrator,
+                                                        synapse=0.05)
+
+            self.__controlling_connection = nengo.Connection(self.__robot_goal_admissible_neuron,
+                                                           self.__controlling_neuron,
+                                                           function=self.control_values,
+                                                        synapse=0.05)
 
 
-            "Probes"
 
-            # Neuron Probes
+            """
+            Probes.
 
-            self.mover_neuron_probe = nengo.Probe(self.mover_neuron, synapse=0.01)
+            Shows how to use probes to take data from the model and plot it.
+            The following probes are used to track data for the default plot of the integrator.
+            This data is ploted in the default configuration of the gui.
 
-            self.position_neuron_probe = nengo.Probe(self.position_neuron, synapse=0.01)
-            self.velocity_neuron_probe = nengo.Probe(self.velocity_neuron, synapse=0.01)
-            self.goal_neuron_probe = nengo.Probe(self.goal_neuron, synapse=0.01)
+            To print the plot to a pdf file, use the following code:
 
+            from matplotlib import pyplot as plt
+            from matplotlib.backends.backend_pdf import PdfPages
+            pp = PdfPages('example.pdf')
+            plt.plot(self.sim.trange(), self.sim.data[self.integrator_probe], label='Integrator')
+            plt.plot(self.sim.trange(), self.sim.data[self.integrator_connection_probe], label='Con')
+            plt.plot(self.sim.trange(), self.sim.data[self.integrator_self_connection_probe], label='Self Con')
+            plt.plot(self.sim.trange(), self.sim.data[self.robot_goal_neuron_probe][:, 2], label='Real')
+            plt.savefig(pp, format='pdf')
+            pp.close()
+            """
+            self.robot_goal_neuron_probe = nengo.Probe(self.__robot_goal_neuron, synapse = 0.01)
+            self.integrator_probe = nengo.Probe(self.__integrator, synapse = 0.01)
+            self.integrator_connection_probe = nengo.Probe(self.__integrator_connection, synapse=0.01)
+            self.integrator_self_connection_probe = nengo.Probe(self.__integrator_self_connection, synapse=0.01)
 
-            # Connection Probes
-
-            self.mover_con_probe = nengo.Probe(self.mover_con)
-
-            self.position_connection_probe = nengo.Probe(self.position_connection)
-            self.velocity_connection_probe = nengo.Probe(self.velocity_connection)
-
-
-        self.sim = nengo.Simulator(self.model, dt=0.01)
+        # Creates the simulation from our model with a 50 ms timestep
+        self.sim = nengo.Simulator(self.__model, dt=0.05)
 
     """
-    gives back the actual position
+    returns the actual position
     """
-
     def get_position(self, x):
 
-        return self.act_pos
+        return self.__act_pos
 
     """
-    gives back the actual velocity
+    returns the odometry goal
     """
-
-    def get_velocity(self, x):
-
-        return self.act_vel
-
-    """
-    gives back the odometry goal
-    """
-
     def get_goal(self, x):
 
-        return self.act_vel
+        return self.__goal_odom
+
+    """
+    returns the actual scan distances
+    """
+    def get_distances(self, x):
+
+        return self.__scan_distances
+
+    """
+    returns the dynamic window velocities.
+    format is no longer [[v1,w1],[v2,w2],...] but [v1,w1,v2,w2,v3,w3,v4,w4,...]
+    """
+    def get_dynamic_window(self, x):
+
+        temp = []
+
+        for vel in self.__dynamic_window:
+
+            temp.append(vel[0])
+            temp.append(vel[1])
+
+        return temp
+
+    """
+    Returns the angle to the robot goal when given the whole robot goal
+    """
+    def get_goal_angle(self,x):
+
+        return x[2]
+
+    """
+    adds three zeros behind the actual position and returns it
+    """
+    def combine_position_goal(self, x):
+
+        return [x[0], x[1], x[2], 0.0, 0.0, 0.0]
+
+    """
+    adds three zeros before the odometry goal and returns it
+    """
+    def combine_goal_position(self, x):
+
+        return [0.0, 0.0, 0.0, x[0], x[1], x[2]]
+
+    """
+    adds as many zeros behind the actual position as there are velocities returned by get_dynamic_window(...) and returns it
+    """
+    def combine_position_window(self, x):
+
+        temp = [x[0], x[1], x[2]]
+
+        for i in range(0, self.__velocities_combination):
+
+            temp.append(0.0)
+
+        return temp
+
+    """
+    adds three zeros before the actual dynamic window and returns it
+    """
+    def combine_window_position(self, x):
+
+        temp = [0.0, 0.0, 0.0]
+
+        for i in range(0, self.__velocities_combination):
+
+            temp.append(x[i])
+
+        return temp
+
+    """
+    adds as many zeros behind the position window list as there are scan distances and dynamic velocities combined and returns it
+    """
+    def combine_position_window_distances(self, x):
+
+        temp = [x[0], x[1], x[2]]
+
+        for i in range(0, self.__velocities_combination+self.__scans):
+
+            temp.append(0.0)
+
+        return temp
+
+    """
+    adds three zeros before and as many zeros as there are scan distances behind the dynamic window list and returns it
+    """
+    def combine_window_position_distances(self, x):
+
+        temp = [0.0, 0.0, 0.0]
+
+        for i in range(0, self.__velocities_combination):
+
+            temp.append(x[i])
+
+        for j in range(0, self.__scans):
+
+            temp.append(0.0)
+
+        return temp
+
+    """
+    adds as many zeros before the distance list as there are elements in the dynamic window list plus 3 and returns it
+    """
+
+    def combine_distances_position_window(self, x):
+
+        temp = []
+
+        for i in range(0, 3+self.__velocities_combination):
+
+            temp.append(0.0)
+
+        for j in range(0, self.__scans):
+
+            temp.append(x[j])
+
+        return temp
+
+    """
+    adds as many zeros behind the robot goal as there are elements in the admissible velocities and used
+    distances list plus 1 for the integrator value and returns it
+    """
+    def combine_robot_goal_admissible(self, x):
+
+        temp = [x[0], x[1], x[2], 0.0]
+
+        for i in range(0, int(self.__velocities_combination*1.5)):
+
+            temp.append(0.0)
+
+        return temp
+
+    """
+    adds 4 zeros before the admissible velocities and used distances list and returns it
+    """
+
+    def combine_admissible_robot_goal(self, x):
+
+        temp = [0.0, 0.0, 0.0, 0.0]
+
+        for i in range(0, len(x)):
+
+            temp.append(x[i])
+
+        return temp
 
 
     """
-    normalizes the whole rotation with pi, multiplies it with the input an returns it
+    Combines three zeros before and as many zeros as there are values in the admissible velocities and used distances list
+    behind the integrator value and returns it.
     """
 
-    def output_whole(self, x):
-        number = self.get_rad_value() / 3.14159
+    def combine_integrator(self,x):
 
-        #print("Yaaaaaw: %s \n" % number)
+        temp = [0.0, 0.0, 0.0, x[0]]
 
-        return number * x[0]
+        for i in range(0, int(self.__velocities_combination*1.5)):
 
-    """
-    multiplies the last angular change with the input and returns it
-    """
+            temp.append(0.0)
 
-    def output_change(self, x):
-        number = self.get_rad_change()
-
-        #print("Change: %s \n" % number)
-
-        return number * x[0]
+        return temp
 
     """
-    Executes the dynamic window approach to calculate a new velocity command which is than multiplied with the input
-    and returned
+    calculates the goal in the robot frame and returns it
     """
 
-    def move(self, x):
+    def get_robot_goal(self, x):
 
-        best_vel = self.dynamic_window_approach(self.act_vel,
-                                                self.act_pos,
-                                                self.scan_distances,
-                                                self.t)
+        x_old = x[3]
+        y_old = x[4]
+        x_trans = x[0]
+        y_trans = x[1]
 
-        if len(best_vel) > 0:
-            self.vel = best_vel
+        theta_cos = math.cos(x[2])
+        theta_sin = math.sin(x[2])
 
-        print(self.vel)
+        x_new = (theta_cos * x_old) + (theta_sin * y_old) - (theta_cos * x_trans) - (theta_sin * y_trans)
+        y_new = (-theta_sin * x_old) + (theta_cos * y_old) + (theta_sin * x_trans) - (theta_cos * y_trans)
+        theta_new = math.atan2(y_new, x_new)
 
-        return self.vel[0] * x[0]
-
-    """
-    multiplies the actual translational velocity with the input and returns it
-    """
-
-    def translation_speed(self, x):
-
-        return self.act_vel[0] * x[0]
+        return [x_new, y_new, theta_new]
 
     """
-    multiplies the actual angular velocity with the input and returns it
+    Calculates the admissible velocities and returns it
     """
 
-    def rotation_speed(self, x):
+    def get_admissible_velocities(self, x):
 
-        return self.act_vel[1] * x[0]
+        # Position, velocities and measured distances are read out of the input
+        act_pos = [x[0], x[1], x[2]]
+
+        velocities = []
+        new_velocities = []
+
+        for i in range(0, int((self.__velocities_combination / 2))):
+
+            velocities.append([x[3+(i*2)], x[3+(i*2)+1]])
+
+        dists = []
+        used_dists = []
+        smallest = 30
+
+        for j in range(0, self.__scans):
+
+            dists.append(x[3+self.__velocities_combination+j])
+
+            if dists[j] < smallest:
+                smallest = dists[j]
+
+        # these boundaries will later be added to and subtracted from the measured angle of a future position
+        bound_minus = 3
+        bound_plus = 4
+
+        # if a wall is closer than 2.5 meters, the boundaries will be greater
+        if smallest < 2.5:
+            if smallest <= 0.19:
+                bound_minus = 40
+            else:
+                bound_minus = int(7.5/smallest)
+
+            bound_plus = bound_minus + 1
+
+        # goes through all given velocities
+        for velocity in velocities:
+
+            path_dist = 30
+
+            # calculates the future position with the current pair of velocities and transforms it into the robot frame
+            fut_pos = mathematician.calculate_future_pos(act_pos, velocity, self.__t)
+            dif_point = mathematician.transformate_point(act_pos, fut_pos)
+
+            # turns the radian angle to a degree angle and adds 90 degrees, to have a positiv range of possible angles
+            angle = math.degrees(dif_point[2])
+            point_angle = angle + 90.0
+
+            # if the calculated angle is zero, the velocity will be ignored, otherwise the angle will be divided by zero
+            # to match the 91 used matchpoints of the laser scanner.
+            if point_angle != 0:
+                point_angle = int(point_angle/2.0)
+            else:
+                used_dists.append(-1)
+                new_velocities.append(2.0)
+                new_velocities.append(2.0)
+                continue
+
+            # calculates the lower and upper boundaries for the distance search range
+            lower = point_angle - bound_minus
+            upper = point_angle + bound_plus
+
+            if upper > 90:
+                lower = 90 - (bound_minus * 2)
+                upper = 90
+
+            elif lower < 0:
+                lower = 0
+                upper = 0 + (bound_minus * 2)
+
+            # Searches for the smallest distance in the current range and sets path_dist to this value
+            for k in range(lower, upper):
+                if dists[k] < path_dist:
+                    path_dist = dists[k]
+                    angle = (k * 2.0) - 90.0
+
+            # calculates the distance between the future position and the measured object
+            path_dist -= mathematician.calculate_hypot(dif_point[0], dif_point[1])
+
+            # if the distance is not zero, it will be compared, otherwise it will be thrown out of the list
+            if path_dist > 0:
+
+                # calculates a velocity to compare from the measured distance and the robots maximum deccelerations
+                compare_vel = [math.sqrt(path_dist * self.__max_dec[0]), math.sqrt(path_dist * self.__max_dec[1])]
+
+                # if the angle where the distance was measured, is smaller than zero, it will be compared to the negative
+                # rotation velocity of the compare velocity, otherwise it will be compared to the normal rotation velocity
+                if angle < 0:
+                    compare_vel[1] = -compare_vel[1]
+
+                    # If both tested velocities are smaller than the compare velocities it is added to our list, otherwise
+                    # default values will be inserted
+                    if velocity[0] <= compare_vel[0] and velocity[1] >= compare_vel[1]:
+                        used_dists.append(path_dist)
+                        new_velocities.append(velocity[0])
+                        new_velocities.append(velocity[1])
+
+                    else:
+                        used_dists.append(-1)
+                        new_velocities.append(2.0)
+                        new_velocities.append(2.0)
+
+                else:
+                    # If both tested velocities are smaller than the compare velocities it is added to our list, otherwise
+                    # default values will be inserted
+                    if velocity[0] <= compare_vel[0] and velocity[1] <= compare_vel[1]:
+                        used_dists.append(path_dist)
+                        new_velocities.append(velocity[0])
+                        new_velocities.append(velocity[1])
+
+                    else:
+                        used_dists.append(-1)
+                        new_velocities.append(2.0)
+                        new_velocities.append(2.0)
+
+            else:
+                used_dists.append(-1)
+                new_velocities.append(2.0)
+                new_velocities.append(2.0)
+
+        # velocities andd the corresponding measured distances are returned
+        velocities_distances = new_velocities + used_dists
+
+        return velocities_distances
 
     """
-    multiplies the actual minimum distance to an object with the input and returns it
+    pi controls the velocities and returns the best velocity.
+    Moreover it will apply the velocity to the robot.
     """
 
-    def minimum_distance(self, x):
+    def control_values(self, x):
 
-        return self.min_distance * x[0]
+        # reads out robot goal, integrator value, velocities and used distances from the input
+        velocities = []
+        dists = []
+        smallest = 30
+        angle = 0
+        goal_robot = [x[0], x[1], x[2]]
+        integrate_sum = x[3]
+
+        for i in range(0, int((self.__velocities_combination / 2))):
+
+            if x[4+(i*2)] != 2.0 and x[4+(i*2)+1] != 2.0:
+
+                velocities.append([x[4 + (i * 2)], x[4 + (i * 2) + 1]])
+
+            if x[4+self.__velocities_combination+i] != -1:
+
+                dists.append(x[4+self.__velocities_combination+i])
+
+                # smallest distance is measured
+                if dists[len(dists)-1] < smallest:
+                    smallest = dists[len(dists)-1]
+                    angle = i - 45
+
+        # the potential velocities are calculated by the pi controller
+        v_pot = math.hypot(goal_robot[0], goal_robot[1])
+        if v_pot > self.__max_vel[0]:
+            v_pot = self.__max_vel[0] * self.__v_proportional
+        else:
+            v_pot *= self.__v_proportional
+
+        w_pot = goal_robot[2] * self.__proportional + integrate_sum * self.__integral
+
+        # the dist_weight is calculated and applied to the potential velocity
+        dist_weight = self.scale(smallest, 0.0, 1.0) * self.__weighting
+        if (angle < 0 and w_pot < 0) or (angle > 0 and w_pot > 0):
+            w_pot *= -dist_weight
+
+        if (angle < 0 and w_pot > 0) or (angle > 0 and w_pot < 0):
+            w_pot *= dist_weight
+
+        vel_pot = [v_pot, w_pot]
+
+        best_weight = 0.0
+
+        best_vel = vel_pot
+
+        # goes through th  velocities and calculates the weights for them
+        for vel in velocities:
+
+            v_distance = math.fabs(vel_pot[0] - vel[0])
+            w_distance = math.fabs(vel_pot[1] - vel[1])
+
+            e = self.__v_factor * self.scale(v_distance, 0, self.__max_vel[0])
+            e2 = self.__w_factor * (self.scale(w_distance, 0, math.fabs(vel_pot[1])))
+            e3 = 1 - self.scale(dists[i], 0.0, 10.0)
+
+            # if the calculated weight is bigger then the best one before, this weight is used as best weight.
+            if (e + e2 + e3) > best_weight:
+                best_weight = (e + e2 + e3)
+                best_vel = vel
+
+        # sets the class attribute vel to the new best_vel
+        self.vel = best_vel
+
+        # applies the velocity to the robot and returns it
+        if self.__robot_sim != 0:
+            self.__robot_sim.motion_publisher(self.__robot_sim.simu, best_vel)
+
+        return best_vel
 
     """
-    multiplies the actual maximum distance to an object with the input and returns it
+    Scales a given distance with a linear interpolation, where the given min and max values are used.
+    If the distance is the same or smaller than the min value, it is weighted with one.
+    If the distance is the same or greater than the max value, it is weighted with zero.
     """
 
-    def maximum_distance(self, x):
+    def scale(self, distance, min, max):
 
-        return self.max_distance * x[0]
+        if distance <= min:
+            return 1
 
-    """
-    multiplies the actual x position with the input and returns it
-    """
+        elif distance >= max:
+            return 0
 
-    def act_x(self, x):
+        else:
+            # form: y = y0 + (y1 - y0) * ((x - x0) / (x1 - x0))
+            # with: y0 = 0, y1 = 1
+            return 1 - ((distance - min) / (max - min))
 
-        return self.act_pos[0] * x[0]
-
-    """
-    multiplies the actual y position with the input and returns it
-    """
-
-    def act_y(self, x):
-
-        return self.act_pos[1] * x[0]
-
-    """
-    calculates the future x position after a certain timestep when keeping the actual velocity, multiplies it with
-    the input and returns ist
-    """
-
-    def future_x(self, x):
-
-        fut_x = self.act_pos[0] + mathematician.calculate_future_x(self.act_pos[2],
-                                             self.act_vel,
-                                             self.t)
-
-        return fut_x * x[0]
-
-    """
-    calculates the future y position after a certain timestep when keeping the actual velocity, multiplies it with
-    the input and returns ist
-    """
-
-    def future_y(self, x):
-
-        fut_y = self.act_pos[1] + mathematician.calculate_future_y(self.act_pos[2],
-                                             self.act_vel,
-                                             self.t)
-
-        return fut_y * x[0]
 
     """
     Gets a number of steps for which the simulation should be run and calls its implemented run_steps method with
@@ -325,43 +711,13 @@ class Model:
             self.sim.step()
 
     """
-    Returns the class variable rad_value
-    """
-
-    def get_rad_value(self):
-        return self.rad_value
-
-    """
-    Returns the class variable rad_change
-    """
-
-    def get_rad_change(self):
-        return self.rad_change
-
-    """
-    Adds the given value to the last known rotation value.
-    The given value should be the real angular change the robot has made.
-    """
-
-    def set_rad_value(self, value):
-        self.rad_value = self.rad_value + value
-        self.rad_change = value
-
-    """
     Sets the class variable robot_sim to the given value.
     The given variable robot should be a pymorse simulation object.
     """
 
     def set_robot_sim(self, robot):
-        self.robot_sim = robot
+        self.__robot_sim = robot
 
-    """
-    Sets the class variable robot_pose to the given value.
-    The given variable pose should be an object returned by a Morse pose sensor.
-    """
-
-    def set_pose(self, pose):
-        self.robot_pose = pose
 
     """
     Sets the class variable robot_odom to the given value.
@@ -370,46 +726,27 @@ class Model:
     """
 
     def set_odom(self, odom):
-        self.robot_odom = odom
 
-        self.act_pos[0] = self.robot_odom.get('x')
-        self.act_pos[1] = self.robot_odom.get('y')
-        self.act_pos[2] = self.robot_odom.get('yaw')
+        self.__act_pos[0] = odom.get('x')
+        self.__act_pos[1] = odom.get('y')
+        self.__act_pos[2] = odom.get('yaw')
 
-        self.act_vel[0] = mathematician.calculate_hypot(self.robot_odom.get('vx'), self.robot_odom.get('vy'))
-        self.act_vel[1] = self.robot_odom.get('wz')
-        # self.act_vel[0] = 1.0
-        # self.act_vel[1] = 0.0
+        self.__act_vel[0] = math.hypot(odom.get('vx'), odom.get('vy'))
+        self.__act_vel[1] = odom.get('wz')
 
     """
     Sets the class variables scan_distances, laser_points, scan_window and laser_res to given values or to values from
     the given laser object.
-    It also sets the class variables min_distance and max_distance by calculating the mininum and maximum from the
-    list scan_distances.
     The given variable laser should be an object returned by a Morse laser sensor (Sick).
     The given variables scan_window and resolution should correspond to the real properties from the Morse laser sensor.
     """
 
     def set_laser(self, laser, scan_window, resolution):
-        act_min = 30.0
-        act_max = 0.0
 
-        self.scan_distances = laser.get('range_list')
-        self.laser_points = laser.get('point_list')
-        self.scan_window = scan_window
-        self.laser_res = resolution
-
-        for i in range(0, len(self.scan_distances)):
-            act_distance = self.scan_distances[i]
-
-            if act_distance < act_min:
-                act_min = act_distance
-
-            if act_distance > act_max:
-                act_max = act_distance
-
-        self.min_distance = act_min
-        self.max_distance = act_max
+        self.__scan_distances = laser.get('range_list')
+        self.__scan_points = laser.get('points_list')
+        self.__scan_window = scan_window
+        self.__laser_res = resolution
 
     """
     Sets the two class variables goal_world and goal_odom to the given values.
@@ -419,175 +756,5 @@ class Model:
 
     def set_goal(self, goal_world, goal_odom):
 
-        self.goal_world = goal_world
-        self.goal_odom = goal_odom
-
-    """
-
-
-
-
-
-
-
-
-
-    """
-
-    def dynamic_window_approach(self, act_vel, act_pos, scan_data, t):
-
-        counter_ad = 0
-        counter_dyn = 0
-
-        goal_robot = mathematician.transformate_point(self.act_pos, self.goal_odom)
-
-        print("WHO AM I? I AM YOU: %s \n" % self.act_vel)
-
-        velocities = []
-        dists = []
-
-        if len(scan_data) <= 0:
-            return velocities
-
-        smallest = 30
-
-        for i in range(0, len(scan_data)):
-            if scan_data[i] < smallest:
-                smallest = scan_data[i]
-
-        bound_minus = 2
-        bound_plus = 3
-
-        if smallest <= 2:
-            bound_minus = int(10/smallest)
-            bound_plus = bound_minus + 1
-
-        if act_vel[1] < 0:
-            lower_w = act_vel[1] - (self.max_acc[1] * t)
-            upper_w = act_vel[1] + (self.max_dec[1] * t)
-        else:
-            lower_w = act_vel[1] - (self.max_dec[1] * t)
-            upper_w = act_vel[1] + (self.max_acc[1] * t)
-
-        if lower_w < (-self.max_vel[1]):
-            lower_w = -self.max_vel[1]
-
-        if upper_w > self.max_vel[1]:
-            upper_w = self.max_vel[1]
-
-        angle_step = 0.1
-
-        while lower_w <= upper_w:
-
-            lower_v = act_vel[0] - (self.max_dec[0] * t)
-            upper_v = act_vel[0] + (self.max_acc[0] * t)
-
-            if lower_v < 0:
-                lower_v = 0
-
-            if upper_v > self.max_vel[0]:
-                upper_v = self.max_vel[0]
-
-            v_step = 0.1
-
-            while lower_v <= upper_v:
-
-                counter_dyn += 1
-
-                velocity = [lower_v, lower_w]
-                path_dist = 30
-
-                fut_pos = mathematician.calculate_future_pos(act_pos, velocity, t)
-                dif_point = mathematician.transformate_point(act_pos, fut_pos)
-
-                fut_pos2 = mathematician.calculate_future_pos(act_pos, velocity, t*2)
-                dif_point2 = mathematician.transformate_point(act_pos, fut_pos2)
-
-                angle = math.degrees(dif_point[2])
-                point_angle = int((angle + 90.0) / 2.0)
-
-                angle2 = math.degrees(dif_point2[2])
-                point_angle2 = int((angle2 + 90.0) / 2.0)
-
-                le_point = dif_point
-
-                lower = point_angle - bound_minus
-                upper = point_angle + bound_plus
-
-                if upper > 90:
-                    lower = 90 - (bound_minus * 2)
-                    upper = 90
-
-                elif lower < 0:
-                    lower = 0
-                    upper = 0 + (bound_minus * 2)
-
-                lower2 = point_angle2 - bound_minus
-                upper2 = point_angle2 + bound_plus
-
-                if upper2 > 90:
-                    lower2 = 90 - (bound_minus * 2)
-                    upper2 = 90
-
-                elif lower2 < 0:
-                    lower2 = 0
-                    upper2 = 0 + (bound_minus * 2)
-
-                for j in range(lower, upper):
-                    if scan_data[j] < path_dist:
-                        path_dist = scan_data[j]
-                        angle = (j * 2.0) - 90.0
-
-                for j in range(lower2, upper2):
-                    if scan_data[j] < path_dist:
-                        path_dist = scan_data[j]
-                        angle = (j * 2.0) - 90.0
-                        le_point = dif_point2
-
-                print("The angle is %s " % angle)
-                print("Distance on path before is %s" % path_dist)
-                path_dist /= 2.0
-                print("What we subtract from is %s" % path_dist)
-                print("What we subtract is %s" % (mathematician.calculate_hypot(le_point[0], le_point[1])))
-                path_dist -= mathematician.calculate_hypot(le_point[0], le_point[1])
-
-                if path_dist < 0:
-                    path_dist = 0
-
-                compare_vel = [23, 42]
-
-                if path_dist > 0:
-                    compare_vel = [math.sqrt(path_dist * self.max_dec[0]), math.sqrt(path_dist * self.max_dec[1])]
-
-                    if angle < 0:
-                        compare_vel[1] = -compare_vel[1]
-
-                        if velocity[0] <= compare_vel[0] and velocity[1] >= compare_vel[1]:
-                            counter_ad += 1
-                            dists.append(path_dist)
-                            velocities.append(velocity)
-
-                    else:
-                        if velocity[0] <= compare_vel[0] and velocity[1] <= compare_vel[1]:
-                            counter_ad += 1
-                            dists.append(path_dist)
-                            velocities.append(velocity)
-
-                print("The velocity %s is compared to the velocity %r" % (velocity, compare_vel))
-                print("Distance on path after is %s \n" % path_dist)
-
-                lower_v += v_step
-
-            lower_w += angle_step
-
-        best_vel = mathematician.p_control(self.act_pos, goal_robot, velocities, dists, t)
-
-        print("WHO AM I? I AM YOU: %s \n" % self.act_vel)
-        print("Dynamic Window : %s \n" % velocities)
-        print("We have %s dynamic velocities, %r remain after safety check. \n" % (counter_dyn, counter_ad))
-        print("%s velocities are unsafe. \n" % (counter_dyn - counter_ad))
-        print("Best Velocity: %s \n" % best_vel)
-        print("Laser: %s \n" % self.scan_distances)
-
-        return best_vel
-
+        self.__goal_world = goal_world
+        self.__goal_odom = goal_odom

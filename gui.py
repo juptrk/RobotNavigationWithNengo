@@ -1,23 +1,25 @@
+__author__ = "Julian Petruck"
+
 import tkinter as tk
-
-from tkinter import Tk, Frame, Canvas, Scrollbar
-from tkinter.constants import NSEW, HORIZONTAL, EW, NS, ALL
-
-from matplotlib import pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 import matplotlib
 matplotlib.use("TkAgg")
+
+from tkinter import Canvas, Scrollbar
+from tkinter.constants import NSEW, HORIZONTAL, EW, NS, ALL
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 from matplotlib.figure import Figure
-from mpl_toolkits.mplot3d import Axes3D
 
+class GUI():
 
-class Gui():
+    """
+    Method gets a Tk instance (master) and a model instance implemented with nengo.
+    It then creates a GUI with the polts that where specified in create_plot(...).
+    """
 
-    f = 0
+    def __init__(self, master, model):
+        self.f = 0
 
-    def __init__(self, master, nengo):
         master.rowconfigure(0, weight=1)
         master.columnconfigure(0, weight=1)
 
@@ -42,7 +44,7 @@ class Gui():
         self.scroll_canvas.config(yscrollcommand=yScrollbar.set)
         yScrollbar.config(command=self.scroll_canvas.yview)
 
-        self.create_plot(nengo)
+        self.create_plot(model)
 
         self.figure_canvas = FigureCanvasTkAgg(self.f, master=self.scroll_canvas)
         self.canvas = self.figure_canvas.get_tk_widget()
@@ -56,40 +58,21 @@ class Gui():
         self.toolbar.pack()
         self.toolbar.update()
 
+        """
+        Adds the specified plots to the figure displayed in the GUI. It gets a model instance implemented with nengo
+        """
+    def create_plot(self, model):
 
-    def create_plot(self, nengo):
-        self.f = Figure(figsize=(20, 9), dpi=80)
+        self.f = Figure(figsize=(16, 9), dpi=80)
 
-        self.ax0 = self.f.add_axes((.025, .55, .21, .4), axisbg=(.75, .75, .75), frameon=True)
-        self.ax1 = self.f.add_axes((.275, .55, .21, .4), axisbg=(.75, .75, .75), frameon=True)
-        self.ax2 = self.f.add_axes((.275, .05, .21, .4), axisbg=(.75, .75, .75), frameon=True)
-        self.ax3 = self.f.add_axes((.525, .55, .21, .4), axisbg=(.75, .75, .75), frameon=True)
-        self.ax3 = self.f.add_axes((.525, .05, .21, .4), axisbg=(.75, .75, .75), frameon=True)
+        """
+        Example plot which plots the integrators back connection, its input, its real value and the real robot goal angle
+        """
+        self.ax00 = self.f.add_axes((.2, .2, .6, .6), axisbg=(.75, .75, .75), frameon=True)
+        self.ax00.plot(model.sim.trange(), model.sim.data[model.integrator_probe], label = 'Integrator')
+        self.ax00.plot(model.sim.trange(), model.sim.data[model.integrator_connection_probe], label = 'Con')
+        self.ax00.plot(model.sim.trange(), model.sim.data[model.integrator_self_connection_probe], label = 'Self Con')
+        self.ax00.plot(model.sim.trange(), model.sim.data[model.robot_goal_neuron_probe][:, 2], label = 'Real')
+        self.ax00.legend()
 
 
-
-        self.ax0.set_xlabel('Time (s)')
-        self.ax0.set_ylabel('Reaction')
-        self.ax0.plot(nengo.sim.trange(), nengo.sim.data[nengo.mover_neuron_probe], label = 'Mover Neurons')
-        self.ax0.plot(nengo.sim.trange(), nengo.sim.data[nengo.mover_con_probe], label = 'Moves')
-        #self.ax0.legend()
-
-        self.ax1.plot(nengo.sim.data[nengo.position_neuron_probe][:, 0],
-                nengo.sim.data[nengo.position_neuron_probe][:, 1])
-        #self.ax1.legend()
-
-        self.ax2.set_xlabel('Time (s)')
-        self.ax2.set_ylabel('Reaction')
-        self.ax2.plot(nengo.sim.trange(), nengo.sim.data[nengo.position_neuron_probe], label='Position Dimensions')
-        self.ax2.plot(nengo.sim.trange(), nengo.sim.data[nengo.position_connection_probe], label='Input')
-        #self.ax2.legend()
-
-        self.ax3.plot(nengo.sim.data[nengo.velocity_neuron_probe][:, 0],
-                nengo.sim.data[nengo.velocity_neuron_probe][:, 1])
-        #self.ax1.legend()
-
-        self.ax4.set_xlabel('Time (s)')
-        self.ax4.set_ylabel('Reaction')
-        self.ax4.plot(nengo.sim.trange(), nengo.sim.data[nengo.velocity_neuron_probe], label='Velocity Dimensions')
-        self.ax4.plot(nengo.sim.trange(), nengo.sim.data[nengo.velocity_connection_probe], label='Input')
-        # self.ax2.legend()
